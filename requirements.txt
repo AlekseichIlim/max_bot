@@ -1,0 +1,4 @@
+ pandas==3.0.5
+ python-dotenv==1.2.2
+ maxapi==1.2.1
+ openpyxl==3.1.5
