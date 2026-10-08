@@ -45,6 +45,28 @@ def read_repot_file(file_path_report, file_path_month):
         valka_gr = (valka.groupby('Оператор\nФИО').agg({'Эффективное время': 'sum',
                                                          'Объем производства': 'sum'}).reset_index()
                     .rename(columns={'Оператор\nФИО': 'Оператор'}))
+        ######
+        EXCLUDE = 'Плотников'
+
+        valka_gr['Фамилия'] = valka_gr['Оператор'].astype(str).str.strip().str.split().str[0]
+
+        valka_gr['_skip'] = valka_gr['Фамилия'].astype(str).str.strip() == EXCLUDE
+        df_skip = valka_gr[valka_gr['_skip']]
+        df_work = valka_gr[~valka_gr['_skip']]
+
+        def agg_group(g):
+            if len(g) == 1:
+                return g.iloc[0]
+            main = g.loc[g['Объем производства'].idxmax()].copy()
+            main['Объем производства'] = g['Объем производства'].sum()
+            main['Эффективное время'] = g['Эффективное время'].sum()
+            return main
+
+        df_work = (df_work.groupby('Фамилия', group_keys=False).apply(agg_group))
+
+        process_gr = (
+            pd.concat([df_work, df_skip]).drop(columns=['_skip']).sort_values('Фамилия').reset_index(drop=True))
+        ######
         valka_gr['Выработка'] = (valka_gr['Объем производства'] / valka_gr['Эффективное время']).round(1)
         valka_gr['Доля'] = (valka_gr['Объем производства'] / valka_gr['Объем производства'].sum() * 100).round().astype(int)
         valka_gr['Объем производства'] = valka_gr['Объем производства'].round().astype(int)
@@ -57,6 +79,28 @@ def read_repot_file(file_path_report, file_path_month):
         process_gr = process.groupby('Оператор\nФИО').agg(
         {'Эффективное время': 'sum', 'Объем производства': 'sum'}).reset_index().rename(
         columns={'Оператор\nФИО': 'Оператор'})
+        ####
+        EXCLUDE = 'Плотников'
+
+        process_gr['Фамилия'] = process_gr['Оператор'].astype(str).str.strip().str.split().str[0]
+
+        process_gr['_skip'] = process_gr['Фамилия'].astype(str).str.strip() == EXCLUDE
+        df_skip = process_gr[process_gr['_skip']]
+        df_work = process_gr[~process_gr['_skip']]
+
+        def agg_group(g):
+            if len(g) == 1:
+                return g.iloc[0]
+            main = g.loc[g['Объем производства'].idxmax()].copy()
+            main['Объем производства'] = g['Объем производства'].sum()
+            main['Эффективное время'] = g['Эффективное время'].sum()
+            return main
+
+        df_work = (df_work.groupby('Фамилия', group_keys=False).apply(agg_group))
+
+        process_gr = (
+            pd.concat([df_work, df_skip]).drop(columns=['_skip']).sort_values('Фамилия').reset_index(drop=True))
+        ####
         process_gr['Выработка'] = (process_gr['Объем производства'] / process_gr['Эффективное время']).round(1)
         process_gr['Доля'] = (process_gr['Объем производства'] / process_gr['Объем производства'].sum() * 100).round().astype(int)
         process_gr['Объем производства'] = process_gr['Объем производства'].round().astype(int)
@@ -88,6 +132,29 @@ def read_repot_file(file_path_report, file_path_month):
                                     'Объем с корой для ПРОЦ, м3/ Кол-во телег для ФОР, шт': 'Количество телег'}))
         ford_gr['Количество телег'] = ford_gr['Количество телег'].astype(float)
         ford_gr['Объем производства'] = (ford_gr['Количество телег'] * volume_one_teleg).round().astype(int)
+        ford_gr = ford_gr[(ford_gr['Объем производства'] > 0)]
+        ###
+        EXCLUDE = 'Плотников'
+
+        ford_gr['Фамилия'] = ford_gr['Оператор'].astype(str).str.strip().str.split().str[0]
+
+        ford_gr['_skip'] = ford_gr['Фамилия'].astype(str).str.strip() == EXCLUDE
+        df_skip = ford_gr[ford_gr['_skip']]
+        df_work = ford_gr[~ford_gr['_skip']]
+
+        def agg_group(g):
+            if len(g) == 1:
+                return g.iloc[0]
+            main = g.loc[g['Объем производства'].idxmax()].copy()
+            main['Объем производства'] = g['Объем производства'].sum()
+            main['Эффективное время'] = g['Эффективное время'].sum()
+            return main
+
+        df_work = (df_work.groupby('Фамилия', group_keys=False).apply(agg_group))
+
+        ford_gr = (
+            pd.concat([df_work, df_skip]).drop(columns=['_skip']).sort_values('Фамилия').reset_index(drop=True))
+        ###
         ford_gr['Выработка'] = (ford_gr['Объем производства'] / ford_gr['Эффективное время']).round(1)
         ford_gr['Доля'] = (ford_gr['Объем производства'] * 100 / volume_ford).round().astype(int)
         mask_ford = ford_gr['Оператор'].astype(str).apply(lambda x: not any(char.isdigit() for char in x))
@@ -146,11 +213,12 @@ def get_str_total(stat_total, stat_oper):
     else:
         c = f'Напилено: {stat['Процесс объем']} м³'
 
-    mes_total = f"""{a}{b}\n{c}\n\nВыполнение плана: {total['Выполнение плана']} %\nКоличество сдельных часов: \
+    mes_total = f"""{a}{b}\n{c}\nОбъем сухостоя свыше 3%: {total['сухостой']} м³\n\nВыполнение плана: {total['Выполнение плана']} %\nКоличество сдельных часов: \
 {total['Количество часов']} ч\nПремия: {total['Премия']} %\n\nКоэффициент на ср.объем хлыста: \
 {total['коэфф ср объем']}\nКоэффициент на ср.запас на гектар: {total['коэфф на запас']}\n\
 Коэффициент на выполнение плана: {total['коэфф на план']}\nОБЩИЙ КОЭФФИЦИЕНТ НА РАСЦЕНКУ: \
-{total['общ коэфф']}\n\nСтоимость сдельного часа: ~{total['стоимость часа']} р."""
+{total['общ коэфф']}\n\nСтоимость сдельного часа\nВПМ: ~{total['стоимость ВПМ']} р.\nПроцессоры: \
+~{total['стоимость проц']} р.\nФорвардеры: ~{total['стоимость форд']} р."""
 
     return mes_total
 
@@ -164,3 +232,12 @@ def get_str_stat(stat):
         for i in v:
             stat_str += f'\n{i['Оператор']} - {i['Объем производства']} // {i['Доля']} // {i['Выработка']}'
     return stat_str
+
+def get_message_new():
+
+    message = f"""Бот обновлен до версии 1.2\n\nСписок изменений:\n\n1. Добавлена информация об объеме заготовленного \
+    сухостоя свыше 3% от общего объема(все что свыше 3% оплачивается на 50% меньше)\n2. Стоимость сдельного часа \
+    "разбита" по фазам \n3. В статистике по операторам, исправлено "дублирование" операторов в следствии некорректных \
+    данных в рапортах"""
+
+    return message
